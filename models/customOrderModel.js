@@ -1,4 +1,3 @@
-// customOrderModel.js
 const mongoose = require("mongoose");
 
 const measurementsSchema = new mongoose.Schema({
@@ -32,7 +31,7 @@ const customOrderSchema = new mongoose.Schema({
   customOrderId: {
     type: String,
     unique: true,
-    sparse: true // Allows null values while maintaining uniqueness
+    required: true
   },
   designerId: {
     type: mongoose.Schema.Types.ObjectId,
@@ -42,6 +41,16 @@ const customOrderSchema = new mongoose.Schema({
   userId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
+    required: true
+  },
+  brandId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: true
+  },
+  productId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Product',
     required: true
   },
   fullName: {
@@ -75,16 +84,6 @@ const customOrderSchema = new mongoose.Schema({
     enum: ['casual', 'eid', 'wedding', 'formal'],
     required: true
   },
-  fabric: {
-    type: String,
-    enum: ['cotton', 'linen', 'silk', 'khaddar'],
-    required: true
-  },
-  color: {
-    type: String,
-    required: true,
-    trim: true
-  },
   pattern: {
     type: String,
     enum: ['solid', 'floral', 'geometric', 'striped'],
@@ -94,6 +93,14 @@ const customOrderSchema = new mongoose.Schema({
     type: String,
     enum: ['regular', 'slim', 'loose'],
     required: true
+  },
+  neckline: {
+    type: String,
+    enum: ['round', 'vneck', 'collar', 'mandarin'],
+  },
+  sleeves: {
+    type: String,
+    enum: ['full', 'threeQuarter', 'half', 'sleeveless'],
   },
   measurements: {
     type: measurementsSchema,
@@ -136,40 +143,13 @@ const customOrderSchema = new mongoose.Schema({
   }
 });
 
-// Generate custom order ID before saving
-customOrderSchema.pre('save', async function(next) {
-  if (this.isNew) {
-    // Get the current date
-    const date = new Date();
-    const year = date.getFullYear().toString().substr(-2);
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    
-    // Find the latest order number for the current month
-    const latestOrder = await this.constructor.findOne({
-      customOrderId: new RegExp(`^CO${year}${month}`)
-    }).sort({ customOrderId: -1 });
-    
-    let orderNumber = 1;
-    if (latestOrder && latestOrder.customOrderId) {
-      const lastNumber = parseInt(latestOrder.customOrderId.slice(-4));
-      orderNumber = lastNumber + 1;
-    }
-    
-    // Generate the new order ID (format: CO-YYMM-XXXX)
-    this.customOrderId = `CO${year}${month}${String(orderNumber).padStart(4, '0')}`;
-  }
-  
-  this.updatedAt = Date.now();
-  next();
-});
-
-// Create indexes
-customOrderSchema.index({ customOrderId: 1 }, { unique: true, sparse: true });
+customOrderSchema.index({ customOrderId: 1 }, { unique: true });
 customOrderSchema.index({ designerId: 1 });
 customOrderSchema.index({ userId: 1 });
+customOrderSchema.index({ brandId: 1 });
+customOrderSchema.index({ productId: 1 });
 customOrderSchema.index({ status: 1 });
 customOrderSchema.index({ createdAt: -1 });
 
-const CustomOrder = mongoose.model("CustomOrder", customOrderSchema);
+module.exports = mongoose.model("CustomOrder", customOrderSchema);
 
-module.exports = CustomOrder;

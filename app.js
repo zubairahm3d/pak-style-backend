@@ -13,6 +13,7 @@ const brandRoutes = require("./routes/brandRoutes");
 const designerRoutes = require("./routes/designerRoutes");
 const orderRoutes = require("./routes/orderRoutes");
 const customOrderRoutes = require("./routes/customOrderRoutes");
+const chatRoutes = require('./routes/chatRoutes');
 
 app.use(cors());
 app.options("*", cors);
@@ -28,6 +29,7 @@ app.use(`${api}/brands`, brandRoutes);
 app.use(`${api}/designers`, designerRoutes);
 app.use(`${api}/orders`, orderRoutes);
 app.use(`${api}/custom-orders`, customOrderRoutes);
+app.use(`${api}/chat`, chatRoutes);
 
 app.all("*", (req, res) => {
   res.status(404).json({
@@ -39,8 +41,6 @@ app.all("*", (req, res) => {
 mongoose
   .connect(process.env.CONNECTION_STRING, {
     dbName: "pak-style",
-    // useNewUrlParser: true,
-    // useUnifiedTopology: true,
   })
   .then(() => {
     console.log("Database connection is ready");
@@ -53,3 +53,4 @@ const port = process.env.PORT || 3000;
 app.listen(port, () => {
   console.log(`Server is running on port ${port}`);
 });
+

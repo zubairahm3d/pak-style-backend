@@ -1,15 +1,43 @@
 const mongoose = require("mongoose");
 
 const userSchema = new mongoose.Schema({
-  userId: String,
-  name: String,
-  username: String,
-  email: String,
-  password: String,
-  passwordConfirm: String,
-  userType: String,
-  profilePicture: String,
-  portfolioImages: [String], 
+  userId: {
+    type: String,
+    required: true,
+    unique: true
+  },
+  name: {
+    type: String,
+    required: true
+  },
+  username: {
+    type: String,
+    required: true,
+    unique: true
+  },
+  email: {
+    type: String,
+    required: true,
+    unique: true
+  },
+  password: {
+    type: String,
+    required: true
+  },
+  passwordConfirm: {
+    type: String,
+    required: true
+  },
+  userType: {
+    type: String,
+    enum: ['customer', 'designer', 'brand', 'admin'],
+    required: true
+  },
+  profilePicture: {
+    type: String,
+    default: "https://res.cloudinary.com/drhzmuvil/image/upload/v1726947332/profile_pictures/fp6pmmmtbc5xcgiiukhp.png"
+  },
+  portfolioImages: [String],
   address: {
     street: String,
     city: String,
@@ -19,10 +47,24 @@ const userSchema = new mongoose.Schema({
   },
   phone: String,
   website: String,
-  status: String,
+  status: {
+    type: String,
+    enum: ['pending', 'active', 'inactive'],
+    default: 'pending'
+  },
+  conversations: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Conversation'
+  }],
+  unreadMessages: {
+    type: Number,
+    default: 0
+  },
+  passwordChangedAt: Date
+}, {
+  timestamps: true
 });
 
-const User = mongoose.model("User", userSchema);
 userSchema.methods.changedPasswordAfter = function (JWTTimeStamp) {
   if (this.passwordChangedAt) {
     const changedTimestamp = parseInt(
@@ -35,4 +77,14 @@ userSchema.methods.changedPasswordAfter = function (JWTTimeStamp) {
   return false;
 };
 
+userSchema.pre('save', function(next) {
+  if (!this.isModified('password') || this.isNew) return next();
+
+  this.passwordChangedAt = Date.now() - 1000; // Subtract 1 second to ensure the token is created after the password has been changed
+  next();
+});
+
+const User = mongoose.model("User", userSchema);
+
 module.exports = User;
+

@@ -2,6 +2,7 @@ const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const uuid = require("uuid");
 const User = require("../models/userModel");
+const Conversation = require("../models/conversationModel");
 const cloudinary = require("../cloudinaryConfig");
 const path = require("path");
 const isUrl = require("is-url");
@@ -10,7 +11,6 @@ const nodemailer = require("nodemailer");
 const dotenv = require("dotenv");
 
 // Configure multer for file uploads
-// const storage = multer.memoryStorage(); // Store files in memory
 const upload = multer({
   storage: multer.diskStorage({
     destination: function (req, file, cb) {
@@ -25,22 +25,17 @@ const upload = multer({
 async function createUser(req, res) {
   try {
     const userId = uuid.v4();
-    const hashedPassword = await bcrypt.hash(req.body.password, 10); // 10 is the salt rounds
-    const hashedConfirmedPassword = await bcrypt.hash(
-      req.body.passwordConfirm,
-      10
-    );
+    const hashedPassword = await bcrypt.hash(req.body.password, 10);
+    const hashedConfirmedPassword = await bcrypt.hash(req.body.passwordConfirm, 10);
 
-    // Default profile picture URL
-    const defaultProfilePicture =
-      "https://res.cloudinary.com/drhzmuvil/image/upload/v1726947332/profile_pictures/fp6pmmmtbc5xcgiiukhp.png";
+    const defaultProfilePicture = "https://res.cloudinary.com/drhzmuvil/image/upload/v1726947332/profile_pictures/fp6pmmmtbc5xcgiiukhp.png";
 
     const userBody = {
       ...req.body,
       userId: userId,
       password: hashedPassword,
       passwordConfirm: hashedConfirmedPassword,
-      profilePicture: defaultProfilePicture, // Use the provided picture or default one
+      profilePicture: defaultProfilePicture,
     };
 
     const newUser = await User.create(userBody);
@@ -54,26 +49,21 @@ async function login(req, res) {
   const { email, password } = req.body;
 
   try {
-    // Find user by email
     const user = await User.findOne({ email });
 
-    // Check if user exists
     if (!user) {
       return res.status(401).json({ error: "Invalid credentials" });
     }
 
-    // Check password
     const passwordMatch = await bcrypt.compare(password, user.password);
     if (!passwordMatch) {
       return res.status(401).json({ error: "Invalid credentials" });
     }
 
-    // Generate JWT token
     const token = jwt.sign({ userId: user.userId }, process.env.JWT_SECRET, {
-      expiresIn: "1h", // Token expires in 1 hour
+      expiresIn: "1h",
     });
 
-    // Respond with token
     res.json({ token });
   } catch (error) {
     res.status(500).json({ error: "Internal server error" });
@@ -84,17 +74,15 @@ async function brandApproval(req, res) {
   const { id, status } = req.body;
 
   try {
-    // Create a transporter for sending emails
     const transporter = nodemailer.createTransport({
       service: "gmail",
       secure: true,
       auth: {
-        user: process.env.GMAIL_USER, // Use environment variables for security
+        user: process.env.GMAIL_USER,
         pass: process.env.GMAIL_PASS,
       },
     });
 
-    // Find user by ID to get the email
     const user = await User.findById(id);
     if (!user) {
       return res.status(404).json({
@@ -104,11 +92,9 @@ async function brandApproval(req, res) {
     }
 
     if (status === "accept") {
-      // Update user's status to 'active'
       user.status = "active";
       await user.save();
 
-      // Prepare the email options
       const mailOptions = {
         from: process.env.EMAIL,
         to: user.email,
@@ -116,7 +102,6 @@ async function brandApproval(req, res) {
         text: `Dear ${user.name},\n\nYour brand account has been activated successfully. You can now log in using your email and password.\n\nBest regards,\nPak Style Team`,
       };
 
-      // Send the email
       await transporter.sendMail(mailOptions);
 
       return res.status(200).json({
@@ -125,10 +110,8 @@ async function brandApproval(req, res) {
         user,
       });
     } else if (status === "reject") {
-      // Remove the user from the database
       await User.findByIdAndDelete(id);
 
-      // Prepare the email options for rejection
       const mailOptions = {
         from: process.env.EMAIL,
         to: user.email,
@@ -136,13 +119,11 @@ async function brandApproval(req, res) {
         text: `Dear ${user.name},\n\nWe regret to inform you that your brand account cannot be created at this time. Please try again later.\n\nBest regards,\nPak Style Team`,
       };
 
-      // Send the rejection email
       await transporter.sendMail(mailOptions);
 
       return res.status(200).json({
         status: "success",
-        message:
-          "Brand account rejected and removed successfully. Rejection email sent.",
+        message: "Brand account rejected and removed successfully. Rejection email sent.",
       });
     } else {
       return res.status(400).json({
@@ -161,43 +142,32 @@ async function brandApproval(req, res) {
 
 async function changePassword(req, res) {
   const { id, password, newPassword, confirmNewPassword } = req.body;
-  console.log(id);
   try {
-    // Find the user by ID
     const user = await User.findById(id);
 
     if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
 
-    // Check if the old password matches the stored password
     const passwordMatch = await bcrypt.compare(password, user.password);
     if (!passwordMatch) {
       return res.status(401).json({ error: "Incorrect old password" });
     }
 
-    // Check if the new password matches the confirm password field
     if (newPassword !== confirmNewPassword) {
       return res.status(400).json({ error: "New passwords do not match" });
     }
 
-    // Hash the new password
     const hashedNewPassword = await bcrypt.hash(newPassword, 10);
 
-    // Update the user's password in the database
     user.password = hashedNewPassword;
-
-    // Optionally, rehash the passwordConfirm field (if still needed in your model)
     user.passwordConfirm = await bcrypt.hash(confirmNewPassword, 10);
 
-    // Save the updated user
     await user.save();
 
     res.status(200).json({ message: "Password changed successfully" });
   } catch (error) {
-    res
-      .status(500)
-      .json({ message: "Internal server error", error: error.message });
+    res.status(500).json({ message: "Internal server error", error: error.message });
   }
 }
 
@@ -250,7 +220,6 @@ async function changeProfilePic(req, res) {
     try {
       const { email } = req.body;
 
-      // Find the user by email
       const user = await User.findOne({ email });
 
       if (!user) {
@@ -261,15 +230,12 @@ async function changeProfilePic(req, res) {
         return res.status(400).json({ message: "No file uploaded" });
       }
 
-      // Upload image to Cloudinary
       const result = await cloudinary.uploader.upload(req.file.path, {
         folder: "profile_pictures",
       });
 
-      // Update the profile picture link with the URL from Cloudinary
       user.profilePicture = result.secure_url;
 
-      // Save the updated user
       await user.save();
 
       res.status(200).json({
@@ -278,12 +244,11 @@ async function changeProfilePic(req, res) {
         url: result.secure_url,
       });
     } catch (error) {
-      res
-        .status(500)
-        .json({ message: "Internal server error", error: error.message });
+      res.status(500).json({ message: "Internal server error", error: error.message });
     }
   });
 }
+
 const uploadPortfolioImages = async (req, res) => {
   const upload = multer({
     storage: multer.diskStorage({
@@ -294,7 +259,7 @@ const uploadPortfolioImages = async (req, res) => {
         cb(null, file.fieldname + '-' + Date.now() + path.extname(file.originalname))
       }
     })
-  }).array('portfolioImages', 10); // Allow up to 10 images
+  }).array('portfolioImages', 10);
 
   upload(req, res, async function (err) {
     if (err instanceof multer.MulterError) {
@@ -315,7 +280,6 @@ const uploadPortfolioImages = async (req, res) => {
         return res.status(400).json({ message: "No files uploaded" });
       }
 
-      // Upload each image to Cloudinary and collect URLs
       const uploadPromises = req.files.map(file => 
         cloudinary.uploader.upload(file.path, {
           folder: "portfolio_images"
@@ -325,7 +289,6 @@ const uploadPortfolioImages = async (req, res) => {
       const results = await Promise.all(uploadPromises);
       const imageUrls = results.map(result => result.secure_url);
 
-      // Add new images to the user's portfolio
       user.portfolioImages = [...(user.portfolioImages || []), ...imageUrls];
       await user.save();
 
@@ -389,6 +352,147 @@ const getDesignerPortfolio = async (req, res) => {
   }
 };
 
+async function startConversation(req, res) {
+  try {
+    const { userId, recipientId, message } = req.body;
+
+    const conversation = new Conversation({
+      participants: [userId, recipientId],
+      messages: [{
+        sender: userId,
+        content: message
+      }]
+    });
+
+    await conversation.save();
+
+    await User.updateMany(
+      { _id: { $in: [userId, recipientId] } },
+      { $push: { conversations: conversation._id } }
+    );
+
+    await User.findByIdAndUpdate(recipientId, { $inc: { unreadMessages: 1 } });
+
+    res.status(201).json(conversation);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+}
+
+async function sendMessage(req, res) {
+  try {
+    const { userId, conversationId, message } = req.body;
+
+    const conversation = await Conversation.findById(conversationId);
+    if (!conversation) {
+      return res.status(404).json({ error: 'Conversation not found' });
+    }
+
+    conversation.messages.push({
+      sender: userId,
+      content: message
+    });
+    conversation.lastMessage = Date.now();
+    await conversation.save();
+
+    const recipient = conversation.participants.find(p => p.toString() !== userId);
+    await User.findByIdAndUpdate(recipient, { $inc: { unreadMessages: 1 } });
+
+    res.status(200).json(conversation);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+}
+
+async function getConversations(req, res) {
+  try {
+    const { userId } = req.params;
+    const user = await User.findById(userId).populate({
+      path: 'conversations',
+      populate: {
+        path: 'participants',
+        select: 'name profilePicture'
+      }
+    });
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    res.status(200).json(user.conversations);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+}
+
+async function getMessages(req, res) {
+  try {
+    const { conversationId } = req.params;
+    const conversation = await Conversation.findById(conversationId).populate({
+      path: 'messages.sender',
+      select: 'name profilePicture'
+    });
+
+    if (!conversation) {
+      return res.status(404).json({ error: 'Conversation not found' });
+    }
+
+    res.status(200).json(conversation.messages);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+}
+
+async function markMessagesAsRead(req, res) {
+  try {
+    const { userId, conversationId } = req.body;
+
+    const conversation = await Conversation.findById(conversationId);
+    if (!conversation) {
+      return res.status(404).json({ error: 'Conversation not found' });
+    }
+
+    conversation.messages.forEach(message => {
+      if (message.sender.toString() !== userId && !message.read) {
+        message.read = true;
+      }
+    });
+    await conversation.save();
+
+    await User.findByIdAndUpdate(userId, { unreadMessages: 0 });
+
+    res.status(200).json({ message: 'Messages marked as read' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+}
+
+async function getTotalUnreadMessagesCount(req, res) {
+  try {
+    const { userId } = req.params;
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Calculate total unread messages across all conversations
+    const conversations = await Conversation.find({ participants: userId });
+    let totalUnreadCount = 0;
+
+    for (const conversation of conversations) {
+      const unreadCount = conversation.messages.filter(
+        message => message.sender.toString() !== userId && !message.read
+      ).length;
+      totalUnreadCount += unreadCount;
+    }
+
+    res.status(200).json({ count: totalUnreadCount });
+  } catch (error) {
+    console.error('Error getting total unread messages count:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+}
+
 module.exports = {
   createUser,
   login,
@@ -401,5 +505,12 @@ module.exports = {
   brandApproval,
   uploadPortfolioImages,
   removePortfolioImage,
-  getDesignerPortfolio
+  getDesignerPortfolio,
+  startConversation,
+  sendMessage,
+  getConversations,
+  getMessages,
+  markMessagesAsRead,
+  getTotalUnreadMessagesCount
 };
+

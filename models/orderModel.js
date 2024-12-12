@@ -13,12 +13,18 @@ const orderSchema = new mongoose.Schema({
     type: String,
     unique: true,
     default: () => new mongoose.Types.ObjectId(),
-  }, // Example of generating unique IDs
+  },
   userId: String,
   totalPrice: Number,
   orderDate: Date,
   status: String,
   paymentMethod: String,
+  paymentStatus: {
+    type: String,
+    enum: ['pending', 'paid', 'failed'],
+    default: 'pending'
+  },
+  stripePaymentIntentId: String,
   shippingAddress: {
     street: String,
     city: String,
@@ -26,9 +32,10 @@ const orderSchema = new mongoose.Schema({
     country: String,
     zipCode: String,
   },
-  items: [itemSchema], // Array of items
+  items: [itemSchema],
 });
 
 const Order = mongoose.model("Order", orderSchema);
 
 module.exports = Order;
+
